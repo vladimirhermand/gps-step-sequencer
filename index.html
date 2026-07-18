@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>TERRATONE — GPS Melody Unit</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+<style>
+  :root{
+    --bg:#191b16;
+    --panel:#22251f;
+    --panel-edge:#2e322a;
+    --ink:#e9e4d3;
+    --ink-dim:#8d8a7c;
+    --led:#ffb23e;
+    --led-glow:rgba(255,178,62,.55);
+    --led-off:#37392f;
+    --lock:#9ed158;
+    --warn:#e06a4a;
+    --slot:#101210;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{background:var(--bg);color:var(--ink);
+    font-family:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:13px;line-height:1.45;}
+  body{max-width:460px;margin:0 auto;padding:14px 14px 60px;}
+
+  header{display:flex;align-items:baseline;justify-content:space-between;
+    border-bottom:1px solid var(--panel-edge);padding-bottom:10px;margin-bottom:14px;}
+  header h1{font-size:15px;letter-spacing:.32em;font-weight:700;}
+  header .ver{color:var(--ink-dim);font-size:10px;letter-spacing:.15em;}
+
+  .panel{background:var(--panel);border:1px solid var(--panel-edge);
+    border-radius:10px;padding:12px;margin-bottom:12px;}
+  .panel h2{font-size:10px;letter-spacing:.28em;color:var(--ink-dim);
+    text-transform:uppercase;margin-bottom:10px;}
+
+  /* ---------- LED ring ---------- */
+  #ringWrap{display:flex;flex-direction:column;align-items:center;padding:6px 0 2px;}
+  #ring{width:230px;height:230px;}
+  .ledDot{fill:var(--led-off);transition:fill .06s, filter .06s;}
+  .ledDot.on{fill:var(--led);filter:drop-shadow(0 0 6px var(--led-glow));}
+  .ledDot.head{fill:#6f6650;}
+  .ledDot.head.on{fill:var(--led);}
+  #ringCenter{text-anchor:middle;fill:var(--ink);font-family:inherit;}
+  #ringStatus{font-size:9px;letter-spacing:.2em;fill:var(--ink-dim);text-anchor:middle;}
+  #ringAcc{font-size:12px;text-anchor:middle;fill:var(--ink);}
+  #ringNote{font-size:22px;font-weight:700;text-anchor:middle;fill:var(--led);}
+
+  /* ---------- digit strip ---------- */
+  #digits{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin-top:10px;}
+  .dg{width:26px;height:32px;display:flex;align-items:center;justify-content:center;
+    background:var(--slot);border:1px solid var(--panel-edge);border-radius:4px;
+    font-size:15px;color:var(--ink-dim);}
+  .dg.whole{border-color:#4a4e40;color:#b3ae97;}
+  .dg.cur{color:var(--bg);background:var(--led);border-color:var(--led);
+    box-shadow:0 0 8px var(--led-glow);font-weight:700;}
+  #digitLegend{margin-top:8px;text-align:center;color:var(--ink-dim);font-size:10px;letter-spacing:.08em;}
+
+  /* ---------- transport ---------- */
+  #transport{display:flex;gap:8px;}
+  button{font-family:inherit;font-size:12px;letter-spacing:.12em;cursor:pointer;
+    background:var(--slot);color:var(--ink);border:1px solid var(--panel-edge);
+    border-radius:6px;padding:12px 10px;flex:1;text-transform:uppercase;}
+  button:active{background:var(--panel-edge);}
+  button.primary{background:var(--led);color:#181405;border-color:var(--led);font-weight:700;}
+  button.small{flex:0 0 auto;padding:8px 12px;font-size:11px;}
+  button:focus-visible{outline:2px solid var(--led);outline-offset:2px;}
+
+  /* ---------- controls ---------- */
+  .row{display:flex;align-items:center;gap:8px;margin-bottom:9px;}
+  .row label{flex:0 0 88px;font-size:10px;letter-spacing:.14em;color:var(--ink-dim);
+    text-transform:uppercase;}
+  .row input[type=range]{flex:1;accent-color:var(--led);height:26px;}
+  .row .val{flex:0 0 52px;text-align:right;font-size:11px;color:var(--ink);}
+  .row select{flex:1;background:var(--slot);color:var(--ink);border:1px solid var(--panel-edge);
+    border-radius:5px;padding:8px;font-family:inherit;font-size:12px;}
+  .segs{display:flex;flex:1;gap:5px;}
+  .segs button{padding:8px 4px;font-size:10px;}
+  .segs button.sel{background:var(--led);color:#181405;border-color:var(--led);font-weight:700;}
+
+  .toggleRow{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;}
+  .toggleRow span{font-size:10px;letter-spacing:.14em;color:var(--ink-dim);text-transform:uppercase;}
+  .tg{width:46px;height:26px;border-radius:13px;background:var(--slot);
+    border:1px solid var(--panel-edge);position:relative;flex:0 0 auto;padding:0;}
+  .tg::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;
+    border-radius:50%;background:var(--ink-dim);transition:left .12s, background .12s;}
+  .tg.on{background:#3d3524;border-color:var(--led);}
+  .tg.on::after{left:23px;background:var(--led);}
+
+  #gpsLine{display:flex;justify-content:space-between;font-size:11px;margin-bottom:8px;color:var(--ink-dim);}
+  #gpsLine b{color:var(--ink);font-weight:400;}
+  #gpsLine .lock{color:var(--lock);}
+  #gpsLine .bad{color:var(--warn);}
+  #manualPad{display:none;margin-top:8px;}
+  #manualPad.show{display:block;}
+  #dpad{display:grid;grid-template-columns:repeat(3,54px);gap:6px;justify-content:center;margin-top:8px;}
+  #dpad button{padding:12px 0;font-size:14px;}
+  #dpad .blank{visibility:hidden;}
+  #coordInputs{display:flex;gap:6px;}
+  #coordInputs input{flex:1;background:var(--slot);border:1px solid var(--panel-edge);
+    color:var(--ink);border-radius:5px;padding:8px;font-family:inherit;font-size:12px;width:50%;}
+
+  #msg{font-size:10px;color:var(--ink-dim);letter-spacing:.06em;margin-top:6px;min-height:14px;text-align:center;}
+  @media (prefers-reduced-motion: reduce){ .ledDot,.tg::after{transition:none;} }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>TERRATONE</h1>
+  <div class="ver">GPS MELODY UNIT · P-01</div>
+</header>
+
+<!-- ============ RING ============ -->
+<div class="panel">
+  <div id="ringWrap">
+    <svg id="ring" viewBox="0 0 230 230" aria-label="Step sequencer ring"></svg>
+    <div id="digits"></div>
+    <div id="digitLegend">waiting for position</div>
+  </div>
+</div>
+
+<!-- ============ TRANSPORT ============ -->
+<div class="panel">
+  <div id="transport">
+    <button id="btnPower" class="primary">Power on</button>
+    <button id="btnPlay" disabled>Play</button>
+  </div>
+  <div id="msg"></div>
+</div>
+
+<!-- ============ LOCATION ============ -->
+<div class="panel">
+  <h2>Location</h2>
+  <div id="gpsLine">
+    <span>LAT <b id="latV">—</b></span>
+    <span>LON <b id="lonV">—</b></span>
+    <span id="accV">ACC —</span>
+  </div>
+  <div class="toggleRow">
+    <span>Include whole number</span>
+    <button class="tg on" id="tgWhole" aria-label="Include whole number"></button>
+  </div>
+  <div class="row">
+    <label>Cell size</label>
+    <div class="segs" id="segCell">
+      <button data-dec="3">110 m</button>
+      <button data-dec="4" class="sel">11 m</button>
+      <button data-dec="5">1.1 m</button>
+    </div>
+  </div>
+  <div class="toggleRow">
+    <span>Manual position (test indoors)</span>
+    <button class="tg" id="tgManual" aria-label="Manual position"></button>
+  </div>
+  <div id="manualPad">
+    <div id="coordInputs">
+      <input id="inLat" inputmode="decimal" value="40.7128" aria-label="Latitude">
+      <input id="inLon" inputmode="decimal" value="-74.0060" aria-label="Longitude">
+    </div>
+    <div id="dpad">
+      <span class="blank"></span><button data-d="n">▲</button><span class="blank"></span>
+      <button data-d="w">◀</button><button data-d="rnd">✦</button><button data-d="e">▶</button>
+      <span class="blank"></span><button data-d="s">▼</button><span class="blank"></span>
+    </div>
+    <div id="digitLegend" style="margin-top:6px;text-align:center;color:var(--ink-dim);font-size:10px;">
+      arrows move ~11 m · ✦ jumps somewhere random
+    </div>
+  </div>
+</div>
+
+<!-- ============ MUSIC ============ -->
+<div class="panel">
+  <h2>Melody</h2>
+  <div class="row">
+    <label>Scale</label>
+    <select id="selScale">
+      <option value="chromatic" selected>Chromatic</option>
+      <option value="major">Major</option>
+      <option value="minor">Natural minor</option>
+      <option value="minpent">Minor pentatonic</option>
+      <option value="majpent">Major pentatonic</option>
+      <option value="blues">Blues</option>
+    </select>
+  </div>
+  <div class="row">
+    <label>Root</label>
+    <select id="selRoot"></select>
+  </div>
+  <div class="row"><label>Tempo</label>
+    <input type="range" id="rTempo" min="50" max="220" value="120">
+    <span class="val" id="vTempo">120</span></div>
+  <div class="row"><label>Gate</label>
+    <input type="range" id="rGate" min="10" max="95" value="60">
+    <span class="val" id="vGate">60%</span></div>
+</div>
+
+<!-- ============ SYNTH ============ -->
+<div class="panel">
+  <h2>Synth</h2>
+  <div class="row">
+    <label>Wave</label>
+    <div class="segs" id="segWave">
+      <button data-w="sine">SIN</button>
+      <button data-w="triangle" class="sel">TRI</button>
+      <button data-w="square">SQR</button>
+      <button data-w="sawtooth">SAW</button>
+    </div>
+  </div>
+  <div class="row"><label>Attack</label>
+    <input type="range" id="rAtk" min="1" max="1000" value="8">
+    <span class="val" id="vAtk">8ms</span></div>
+  <div class="row"><label>Decay</label>
+    <input type="range" id="rDec" min="10" max="1500" value="180">
+    <span class="val" id="vDec">180ms</span></div>
+  <div class="row"><label>Sustain</label>
+    <input type="range" id="rSus" min="0" max="100" value="35">
+    <span class="val" id="vSus">35%</span></div>
+  <div class="row"><label>Release</label>
+    <input type="range" id="rRel" min="10" max="3000" value="300">
+    <span class="val" id="vRel">300ms</span></div>
+  <div class="row"><label>Cutoff</label>
+    <input type="range" id="rCut" min="100" max="8000" value="2500">
+    <span class="val" id="vCut">2.5k</span></div>
+  <div class="row"><label>Resonance</label>
+    <input type="range" id="rRes" min="0" max="20" value="2" step="0.5">
+    <span class="val" id="vRes">2.0</span></div>
+</div>
+
+<!-- ============ MODULATION ============ -->
+<div class="panel">
+  <h2>Modulation</h2>
+  <div class="row"><label>Filter LFO</label>
+    <input type="range" id="rFRate" min="0" max="120" value="6" step="1">
+    <span class="val" id="vFRate">0.6Hz</span></div>
+  <div class="row"><label>F-Depth</label>
+    <input type="range" id="rFDep" min="0" max="100" value="0">
+    <span class="val" id="vFDep">0%</span></div>
+  <div class="row"><label>Vibrato</label>
+    <input type="range" id="rVRate" min="1" max="150" value="50" step="1">
+    <span class="val" id="vVRate">5.0Hz</span></div>
+  <div class="row"><label>V-Depth</label>
+    <input type="range" id="rVDep" min="0" max="100" value="0">
+    <span class="val" id="vVDep">0%</span></div>
+  <div class="row"><label>Reverb</label>
+    <input type="range" id="rRevW" min="0" max="100" value="25">
+    <span class="val" id="vRevW">25%</span></div>
+  <div class="row"><label>Rev size</label>
+    <input type="range" id="rRevD" min="5" max="80" value="25">
+    <span class="val" id="vRevD">2.5s</span></div>
+  <div class="row"><label>Volume</label>
+    <input type="range" id="rVol" min="-40" max="0" value="-8">
+    <span class="val" id="vVol">-8dB</span></div>
+</div>
+
+<script>
+"use strict";
+/* =========================================================
+   TERRATONE P-01 — coordinates are the melody.
+   Digits of lat/lon, interleaved by decimal place, become
+   scale degrees. Wander a little: only the tail changes.
+   ========================================================= */
+
+const $ = id => document.getElementById(id);
+
+const state = {
+  lat: null, lon: null, acc: null,
+  manual: false,
+  includeWhole: true,
+  decimals: 4,             // 4 ≈ 11 m per digit step
+  digits: [],              // committed melody digits
+  wholeCount: 0,           // how many leading digits come from the integer part
+  step: 0,
+  scale: "chromatic",
+  rootMidi: 48,            // C3
+  wave: "triangle",
+  gate: 0.6,
+  candidate: null, candHits: 0,
+  running: false, powered: false,
+  watchId: null,
+};
+
+const SCALES = {
+  chromatic:[0,1,2,3,4,5,6,7,8,9,10,11],
+  major:[0,2,4,5,7,9,11],
+  minor:[0,2,3,5,7,8,10],
+  minpent:[0,3,5,7,10],
+  majpent:[0,2,4,7,9],
+  blues:[0,3,5,6,7,10],
+};
+const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+
+/* ---------------- audio graph ---------------- */
+let synth, filter, filterLFO, vibrato, reverb, vol, loop;
+
+async function powerOn(){
+  await Tone.start();
+
+  vol      = new Tone.Volume(-8).toDestination();
+  reverb   = new Tone.Reverb({decay:2.5, wet:0.25}).connect(vol);
+  vibrato  = new Tone.Vibrato({frequency:5, depth:0}).connect(reverb);
+  filter   = new Tone.Filter({type:"lowpass", frequency:2500, Q:2}).connect(vibrato);
+  synth    = new Tone.Synth({
+    oscillator:{type:state.wave},
+    envelope:{attack:0.008, decay:0.18, sustain:0.35, release:0.3},
+  }).connect(filter);
+
+  filterLFO = new Tone.LFO({frequency:0.6, min:2500, max:2500}).start();
+  filterLFO.connect(filter.frequency);
+
+  await reverb.generate();
+
+  Tone.Transport.bpm.value = +$("rTempo").value;
+  loop = new Tone.Loop(tick, "8n");
+  loop.start(0);
+
+  state.powered = true;
+  $("btnPower").textContent = "Powered";
+  $("btnPower").classList.remove("primary");
+  $("btnPower").disabled = true;
+  $("btnPlay").disabled = false;
+  $("btnPlay").classList.add("primary");
+  msg("audio engine ready");
+}
+
+function tick(time){
+  const seq = state.digits;
+  if(!seq.length) return;
+  state.step = state.step % seq.length;
+  const digit = seq[state.step];
+  const freq = digitToFreq(digit);
+  const stepDur = Tone.Time("8n").toSeconds();
+  synth.triggerAttackRelease(freq, stepDur * state.gate, time);
+  const s = state.step;
+  Tone.Draw.schedule(()=>paintStep(s, digit), time);
+  state.step = (state.step + 1) % seq.length;
+}
+
+function digitToFreq(d){
+  const sc = SCALES[state.scale];
+  let semis;
+  if(state.scale === "chromatic"){
+    semis = d;                              // digit is literally the semitone
+  } else {
+    const idx = d % sc.length;
+    const oct = Math.floor(d / sc.length);
+    semis = sc[idx] + 12*oct;
+  }
+  const midi = state.rootMidi + semis;
+  return 440 * Math.pow(2, (midi - 69) / 12);
+}
+
+/* ---------------- digits from coordinates ---------------- */
+function coordsToDigits(lat, lon){
+  const dec = state.decimals;
+  const aLat = Math.abs(lat).toFixed(dec);
+  const aLon = Math.abs(lon).toFixed(dec);
+  const [iLat, fLat] = aLat.split(".");
+  const [iLon, fLon] = aLon.split(".");
+  const out = [];
+  let wholeCount = 0;
+  if(state.includeWhole){
+    for(const c of iLat) out.push(+c);
+    for(const c of iLon) out.push(+c);
+    wholeCount = out.length;
+  }
+  // interleave fractional digits by decimal place: coarse → fine.
+  for(let i=0;i<dec;i++){
+    out.push(+fLat[i]);
+    out.push(+fLon[i]);
+  }
+  return {digits: out, wholeCount};
+}
+
+/* Debounce: a new digit string must survive 2 consecutive fixes
+   before we commit, so GPS jitter at a cell edge can't flicker. */
+function onPosition(lat, lon, acc){
+  state.lat = lat; state.lon = lon; state.acc = acc;
+  $("latV").textContent = lat.toFixed(5);
+  $("lonV").textContent = lon.toFixed(5);
+  if(acc != null){
+    $("accV").innerHTML = `ACC <b class="${acc<=15?'lock':'bad'}">${Math.round(acc)}m</b>`;
+  } else {
+    $("accV").textContent = "ACC —";
+  }
+
+  const {digits, wholeCount} = coordsToDigits(lat, lon);
+  const key = digits.join("");
+  const curKey = state.digits.join("");
+
+  if(key === curKey){ state.candidate = null; state.candHits = 0; return; }
+
+  if(state.manual){                    // manual moves commit instantly
+    commitDigits(digits, wholeCount);
+    return;
+  }
+  if(key === state.candidate){
+    state.candHits++;
+    if(state.candHits >= 2) commitDigits(digits, wholeCount);
+  } else {
+    state.candidate = key;
+    state.candHits = 1;
+  }
+}
+
+function commitDigits(digits, wholeCount){
+  const lenChanged = digits.length !== state.digits.length;
+  state.digits = digits;
+  state.wholeCount = wholeCount;
+  state.candidate = null; state.candHits = 0;
+  if(lenChanged) state.step = 0;
+  buildRing(); buildDigitStrip();
+  $("digitLegend").textContent =
+    `${digits.length} steps · ${wholeCount ? wholeCount+" whole + " : ""}${digits.length-wholeCount} decimal digits`;
+}
+
+/* ---------------- geolocation ---------------- */
+function startGPS(){
+  if(state.watchId != null) return;
+  if(!("geolocation" in navigator)){ msg("no geolocation — use manual mode"); return; }
+  state.watchId = navigator.geolocation.watchPosition(
+    p => { if(!state.manual) onPosition(p.coords.latitude, p.coords.longitude, p.coords.accuracy); },
+    e => msg("gps: " + e.message + " — try manual mode"),
+    {enableHighAccuracy:true, maximumAge:1000, timeout:15000}
+  );
+}
+
+/* ---------------- ring + digit strip ---------------- */
+function buildRing(){
+  const svg = $("ring");
+  const n = state.digits.length;
+  const cx=115, cy=115, r=100;
+  let dots = "";
+  for(let i=0;i<n;i++){
+    const a = (i/n)*Math.PI*2 - Math.PI/2;
+    const x = cx + r*Math.cos(a), y = cy + r*Math.sin(a);
+    const cls = i < state.wholeCount ? "ledDot head" : "ledDot";
+    dots += `<circle class="${cls}" id="led${i}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="7"/>`;
+  }
+  svg.innerHTML = dots +
+    `<text id="ringNote" x="${cx}" y="${cy-4}">·</text>` +
+    `<text id="ringStatus" x="${cx}" y="${cy+18}">STEP</text>` +
+    `<text id="ringAcc" x="${cx}" y="${cy+36}"> </text>`;
+}
+
+function buildDigitStrip(){
+  const wrap = $("digits");
+  wrap.innerHTML = "";
+  state.digits.forEach((d,i)=>{
+    const el = document.createElement("div");
+    el.className = "dg" + (i < state.wholeCount ? " whole" : "");
+    el.id = "dg"+i;
+    el.textContent = d;
+    wrap.appendChild(el);
+  });
+}
+
+function paintStep(i, digit){
+  const n = state.digits.length;
+  for(let k=0;k<n;k++){
+    const led = $("led"+k), dg = $("dg"+k);
+    if(led) led.classList.toggle("on", k===i);
+    if(dg)  dg.classList.toggle("cur", k===i);
+  }
+  const sc = SCALES[state.scale];
+  let semis = state.scale==="chromatic" ? digit
+            : sc[digit % sc.length] + 12*Math.floor(digit/sc.length);
+  const midi = state.rootMidi + semis;
+  const name = NOTE_NAMES[midi % 12] + (Math.floor(midi/12)-1);
+  const rn = $("ringNote"); if(rn) rn.textContent = name;
+  const ra = $("ringAcc");
+  if(ra) ra.textContent = state.acc!=null ? "±"+Math.round(state.acc)+"m" : "";
+}
+
+/* ---------------- UI wiring ---------------- */
+function msg(t){ $("msg").textContent = t; }
+
+$("btnPower").addEventListener("click", async ()=>{
+  msg("starting audio…");
+  try{ await powerOn(); startGPS(); }
+  catch(e){ msg("audio failed: " + e.message); }
+});
+
+$("btnPlay").addEventListener("click", ()=>{
+  if(!state.powered) return;
+  state.running = !state.running;
+  if(state.running){
+    if(!state.digits.length && state.lat==null){
+      // no fix yet — seed from manual inputs so it plays immediately
+      onPosition(+$("inLat").value, +$("inLon").value, null);
+    }
+    Tone.Transport.start();
+    $("btnPlay").textContent = "Stop";
+    msg("");
+  } else {
+    Tone.Transport.stop();
+    $("btnPlay").textContent = "Play";
+  }
+});
+
+/* toggles */
+$("tgWhole").addEventListener("click", e=>{
+  state.includeWhole = !state.includeWhole;
+  e.currentTarget.classList.toggle("on", state.includeWhole);
+  if(state.lat!=null){
+    const {digits, wholeCount} = coordsToDigits(state.lat, state.lon);
+    commitDigits(digits, wholeCount);
+  }
+});
+$("tgManual").addEventListener("click", e=>{
+  state.manual = !state.manual;
+  e.currentTarget.classList.toggle("on", state.manual);
+  $("manualPad").classList.toggle("show", state.manual);
+  if(state.manual){
+    onPosition(+$("inLat").value, +$("inLon").value, null);
+    msg("manual mode — arrows simulate walking");
+  } else {
+    msg("gps mode");
+  }
+});
+
+/* cell size */
+$("segCell").addEventListener("click", e=>{
+  const b = e.target.closest("button"); if(!b) return;
+  [...$("segCell").children].forEach(x=>x.classList.remove("sel"));
+  b.classList.add("sel");
+  state.decimals = +b.dataset.dec;
+  if(state.lat!=null){
+    const {digits, wholeCount} = coordsToDigits(state.lat, state.lon);
+    commitDigits(digits, wholeCount);
+  }
+});
+
+/* manual pad */
+$("dpad").addEventListener("click", e=>{
+  const b = e.target.closest("button"); if(!b) return;
+  let lat = +$("inLat").value, lon = +$("inLon").value;
+  const stepDeg = Math.pow(10, -state.decimals);   // one grid cell
+  if(b.dataset.d==="n") lat += stepDeg;
+  if(b.dataset.d==="s") lat -= stepDeg;
+  if(b.dataset.d==="e") lon += stepDeg;
+  if(b.dataset.d==="w") lon -= stepDeg;
+  if(b.dataset.d==="rnd"){
+    lat = +( -60 + Math.random()*130 ).toFixed(4);
+    lon = +( -180 + Math.random()*360 ).toFixed(4);
+  }
+  $("inLat").value = lat.toFixed(Math.max(4,state.decimals));
+  $("inLon").value = lon.toFixed(Math.max(4,state.decimals));
+  onPosition(lat, lon, null);
+});
+["inLat","inLon"].forEach(id => $(id).addEventListener("change", ()=>{
+  if(state.manual) onPosition(+$("inLat").value, +$("inLon").value, null);
+}));
+
+/* music selectors */
+NOTE_NAMES.forEach((n,i)=>{
+  for(const oct of [2,3,4]){
+    const o = document.createElement("option");
+    o.value = 12*(oct+1)+i; o.textContent = n+oct;
+    if(o.value==48) o.selected = true;
+    $("selRoot").appendChild(o);
+  }
+});
+$("selScale").addEventListener("change", e=> state.scale = e.target.value);
+$("selRoot").addEventListener("change", e=> state.rootMidi = +e.target.value);
+
+$("segWave").addEventListener("click", e=>{
+  const b = e.target.closest("button"); if(!b) return;
+  [...$("segWave").children].forEach(x=>x.classList.remove("sel"));
+  b.classList.add("sel");
+  state.wave = b.dataset.w;
+  if(synth) synth.oscillator.type = state.wave;
+});
+
+/* sliders — [id, value-id, formatter, apply-fn] */
+function bind(id, vid, fmt, apply){
+  const el = $(id);
+  const upd = ()=>{ $(vid).textContent = fmt(+el.value); if(state.powered) apply(+el.value); };
+  el.addEventListener("input", upd);
+  upd();
+}
+bind("rTempo","vTempo", v=>v, v=>Tone.Transport.bpm.value=v);
+bind("rGate","vGate", v=>v+"%", v=>state.gate=v/100);
+bind("rAtk","vAtk", v=>v+"ms", v=>synth.envelope.attack=v/1000);
+bind("rDec","vDec", v=>v+"ms", v=>synth.envelope.decay=v/1000);
+bind("rSus","vSus", v=>v+"%", v=>synth.envelope.sustain=v/100);
+bind("rRel","vRel", v=>v+"ms", v=>synth.envelope.release=v/1000);
+bind("rCut","vCut", v=>v>=1000?(v/1000).toFixed(1)+"k":v, v=>{ setFilterLFO(); });
+bind("rRes","vRes", v=>v.toFixed(1), v=>filter.Q.value=v);
+bind("rFRate","vFRate", v=>(v/10).toFixed(1)+"Hz", v=>{ filterLFO.frequency.value=v/10; });
+bind("rFDep","vFDep", v=>v+"%", v=>{ setFilterLFO(); });
+bind("rVRate","vVRate", v=>(v/10).toFixed(1)+"Hz", v=>vibrato.frequency.value=v/10);
+bind("rVDep","vVDep", v=>v+"%", v=>vibrato.depth.value=v/100);
+bind("rRevW","vRevW", v=>v+"%", v=>reverb.wet.value=v/100);
+bind("rRevD","vRevD", v=>(v/10).toFixed(1)+"s", v=>reverb.decay=v/10);
+bind("rVol","vVol", v=>v+"dB", v=>vol.volume.value=v);
+
+/* filter LFO sweeps around the cutoff; depth 0 pins it to cutoff */
+function setFilterLFO(){
+  const cut = +$("rCut").value;
+  const dep = +$("rFDep").value / 100;
+  const lo = Math.max(60,  cut * (1 - 0.9*dep));
+  const hi = Math.min(12000, cut * (1 + 1.5*dep));
+  filterLFO.min = lo; filterLFO.max = hi;
+}
+
+/* boot: show something before any fix */
+onPosition(+$("inLat").value, +$("inLon").value, null);
+msg("press power on, then play");
+</script>
+</body>
+</html>
