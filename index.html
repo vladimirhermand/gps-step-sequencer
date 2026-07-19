@@ -105,9 +105,15 @@
 
   #msg{font-size:10px;color:var(--ink-dim);letter-spacing:.06em;margin-top:6px;min-height:14px;text-align:center;}
 
-  /* ---------- oscilloscope ---------- */
-  #scope{width:100%;height:96px;display:block;background:var(--slot);
-    border:1px solid var(--panel-edge);border-radius:6px;}
+  /* ---------- radial scope ---------- */
+  #ringBox{position:relative;width:230px;height:230px;}
+  #ringBox #ring{position:absolute;inset:0;width:230px;height:230px;}
+  #scopeC{position:absolute;inset:0;width:230px;height:230px;}
+
+  button.recOn{background:var(--warn);color:#181405;border-color:var(--warn);font-weight:700;}
+  .hbtn{float:right;font-size:9px;padding:3px 8px;letter-spacing:.12em;
+    background:var(--slot);border:1px solid var(--panel-edge);border-radius:4px;
+    color:var(--ink-dim);text-transform:uppercase;}
 
   /* ---------- melody memory ---------- */
   #saveRow{display:flex;gap:6px;margin-bottom:8px;}
@@ -133,7 +139,10 @@
 <!-- ============ RING ============ -->
 <div class="panel">
   <div id="ringWrap">
-    <svg id="ring" viewBox="0 0 230 230" aria-label="Step sequencer ring"></svg>
+    <div id="ringBox">
+      <canvas id="scopeC" width="460" height="460" aria-label="Output waveform"></canvas>
+      <svg id="ring" viewBox="0 0 230 230" aria-label="Step sequencer ring"></svg>
+    </div>
     <div id="digits"></div>
     <div id="digitLegend">waiting for position</div>
   </div>
@@ -144,14 +153,9 @@
   <div id="transport">
     <button id="btnPower" class="primary">Power on</button>
     <button id="btnPlay" disabled>Play</button>
+    <button id="btnRec" disabled>Rec</button>
   </div>
   <div id="msg"></div>
-</div>
-
-<!-- ============ SCOPE ============ -->
-<div class="panel">
-  <h2>Scope</h2>
-  <canvas id="scope" width="640" height="120" aria-label="Output waveform"></canvas>
 </div>
 
 <!-- ============ LOCATION ============ -->
@@ -205,7 +209,8 @@
       <option value="minor">Natural minor</option>
       <option value="minpent">Minor pentatonic</option>
       <option value="majpent">Major pentatonic</option>
-      <option value="blues">Blues</option>
+      <option value="blues">Blues minor</option>
+      <option value="bluesmaj">Blues major</option>
       <option value="dorian">Dorian</option>
       <option value="phrygian">Phrygian</option>
       <option value="lydian">Lydian</option>
@@ -231,7 +236,7 @@
 
 <!-- ============ SYNTH ============ -->
 <div class="panel">
-  <h2>Synth</h2>
+  <h2>Synth <button id="btnResetSynth" class="hbtn">reset</button></h2>
   <div class="row">
     <label>Wave</label>
     <div class="segs" id="segWave">
@@ -332,6 +337,7 @@ const SCALES = {
   minpent:[0,3,5,7,10],
   majpent:[0,2,4,7,9],
   blues:[0,3,5,6,7,10],
+  bluesmaj:[0,2,3,4,7,9],
   dorian:[0,2,3,5,7,9,10],
   phrygian:[0,1,3,5,7,8,10],
   lydian:[0,2,4,6,7,9,11],
@@ -345,7 +351,7 @@ const SCALES = {
 const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 
 /* ---------------- audio graph ---------------- */
-let synth, filter, filterLFO, vibrato, reverb, vol, loop, scope;
+let synth, filter, filterLFO, vibrato, reverb, vol, loop, scope, recorder;
 
 async function powerOn(){
   await Tone.start();
@@ -364,6 +370,12 @@ async function powerOn(){
 
   scope = new Tone.Analyser("waveform", 1024);
   vol.connect(scope);
+
+  if(window.MediaRecorder){
+    recorder = new Tone.Recorder();
+    vol.connect(recorder);
+    $("btnRec").disabled = false;
+  }
 
   await reverb.generate();
 
@@ -662,36 +674,151 @@ function setFilterLFO(){
   filterLFO.min = lo; filterLFO.max = hi;
 }
 
-/* ---------------- oscilloscope ---------------- */
-function drawScope(){
+/* ---------------- radial scope (ferro-blob) ----------------
+   A dark blob floats in the middle of the ring. Each angle is a
+   waveform sample (mirrored for symmetry); radii ease toward their
+   targets and get a neighbour-smoothing pass, so audio reads as
+   slow liquid spikes rather than jitter. Idle = gentle wobble. */
+const SCOPE_N = 96, SCOPE_BASE = 40, SCOPE_SPIKE = 33;
+const scopeR = new Float32Array(SCOPE_N).fill(SCOPE_BASE);
+const scopeS = new Float32Array(SCOPE_N);
+let scopeCtx = null;
+
+function drawScope(now){
   requestAnimationFrame(drawScope);
-  const c = $("scope");
-  const ctx = c.getContext("2d");
-  const w = c.width, h = c.height;
-  ctx.fillStyle = "#101210";
-  ctx.fillRect(0, 0, w, h);
-  ctx.strokeStyle = "#2e322a";
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(0, h/2); ctx.lineTo(w, h/2); ctx.stroke();
-  if(!scope) return;
-  const v = scope.getValue();
-  // trigger on a rising zero-crossing so the trace holds still
-  let start = 0;
-  for(let i=1; i<v.length/2; i++){
-    if(v[i-1] < 0 && v[i] >= 0){ start = i; break; }
+  if(!scopeCtx){ scopeCtx = $("scopeC").getContext("2d"); scopeCtx.scale(2,2); }
+  const ctx = scopeCtx;
+  ctx.clearRect(0, 0, 230, 230);
+  const cx = 115, cy = 115, t = (now || 0) / 1000;
+  const v = scope ? scope.getValue() : null;
+
+  for(let k=0; k<SCOPE_N; k++){
+    const wob = 1.6*Math.sin(t*2.1 + k*0.55) + 1.0*Math.sin(t*3.7 - k*0.23);
+    let target = SCOPE_BASE + wob;
+    if(v){
+      const half = v.length >> 1;
+      const m = (k < SCOPE_N/2) ? k : (SCOPE_N - 1 - k);   // mirror
+      const idx = (m / (SCOPE_N/2 - 1) * (half - 1)) | 0;
+      target += Math.min(1, Math.abs(v[idx]) * 2.4) * SCOPE_SPIKE;
+    }
+    scopeR[k] += (target - scopeR[k]) * 0.35;
   }
-  const n = Math.floor(v.length/2);
-  ctx.strokeStyle = "#ffb23e";
-  ctx.lineWidth = 2;
+  for(let k=0; k<SCOPE_N; k++){
+    scopeS[k] = (scopeR[(k-1+SCOPE_N)%SCOPE_N] + 2*scopeR[k] + scopeR[(k+1)%SCOPE_N]) / 4;
+  }
+
+  const pts = [];
+  for(let k=0; k<SCOPE_N; k++){
+    const a = k/SCOPE_N * Math.PI*2 - Math.PI/2;
+    pts.push([cx + scopeS[k]*Math.cos(a), cy + scopeS[k]*Math.sin(a)]);
+  }
   ctx.beginPath();
-  for(let i=0; i<n; i++){
-    const x = (i/(n-1))*w;
-    const y = h/2 - v[start+i]*(h/2 - 4);
-    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  ctx.moveTo((pts[SCOPE_N-1][0]+pts[0][0])/2, (pts[SCOPE_N-1][1]+pts[0][1])/2);
+  for(let k=0; k<SCOPE_N; k++){
+    const [x1,y1] = pts[k], [x2,y2] = pts[(k+1)%SCOPE_N];
+    ctx.quadraticCurveTo(x1, y1, (x1+x2)/2, (y1+y2)/2);
   }
+  ctx.closePath();
+
+  const g = ctx.createRadialGradient(cx, cy, 6, cx, cy, SCOPE_BASE + SCOPE_SPIKE);
+  g.addColorStop(0,   "rgba(8,9,8,.94)");
+  g.addColorStop(.72, "rgba(13,14,12,.92)");
+  g.addColorStop(1,   "rgba(255,178,62,.30)");
+  ctx.save();
+  ctx.shadowColor = "rgba(255,178,62,.45)";
+  ctx.shadowBlur = 16;
+  ctx.fillStyle = g;
+  ctx.fill();
+  ctx.restore();
+  ctx.strokeStyle = "rgba(255,178,62,.85)";
+  ctx.lineWidth = 1.6;
   ctx.stroke();
 }
-drawScope();
+requestAnimationFrame(drawScope);
+
+/* ---------------- WAV recording ---------------- */
+let recording = false;
+
+$("btnRec").addEventListener("click", async ()=>{
+  if(!recorder) return;
+  if(!recording){
+    recording = true;
+    await recorder.start();
+    $("btnRec").textContent = "Stop rec";
+    $("btnRec").classList.add("recOn");
+    msg("recording — press again to save wav");
+  } else {
+    recording = false;
+    const blob = await recorder.stop();
+    $("btnRec").textContent = "Rec";
+    $("btnRec").classList.remove("recOn");
+    const stamp = new Date().toISOString().slice(0,19).replace(/[T:]/g,"-");
+    try{
+      const wav = await blobToWav(blob);
+      download(wav, `terratone-${stamp}.wav`);
+      msg("wav saved to downloads");
+    }catch(e){
+      // codec not decodable here — hand over the raw recording instead
+      const ext = (blob.type.split("/")[1] || "webm").split(";")[0];
+      download(blob, `terratone-${stamp}.${ext}`);
+      msg("saved raw recording (wav conversion unsupported on this browser)");
+    }
+  }
+});
+
+async function blobToWav(blob){
+  const buf = await blob.arrayBuffer();
+  const audio = await Tone.getContext().rawContext.decodeAudioData(buf);
+  return encodeWav(audio);
+}
+
+function encodeWav(ab){
+  const ch = Math.min(2, ab.numberOfChannels), len = ab.length, sr = ab.sampleRate;
+  const bytes = len * ch * 2;
+  const dv = new DataView(new ArrayBuffer(44 + bytes));
+  const wstr = (o, s)=>{ for(let i=0;i<s.length;i++) dv.setUint8(o+i, s.charCodeAt(i)); };
+  wstr(0,"RIFF");            dv.setUint32(4, 36 + bytes, true);
+  wstr(8,"WAVE");            wstr(12,"fmt ");
+  dv.setUint32(16, 16, true);      dv.setUint16(20, 1, true);
+  dv.setUint16(22, ch, true);      dv.setUint32(24, sr, true);
+  dv.setUint32(28, sr*ch*2, true); dv.setUint16(32, ch*2, true);
+  dv.setUint16(34, 16, true);
+  wstr(36,"data");           dv.setUint32(40, bytes, true);
+  const chans = [];
+  for(let c=0; c<ch; c++) chans.push(ab.getChannelData(c));
+  let o = 44;
+  for(let i=0; i<len; i++){
+    for(let c=0; c<ch; c++){
+      const s = Math.max(-1, Math.min(1, chans[c][i]));
+      dv.setInt16(o, s < 0 ? s*0x8000 : s*0x7fff, true);
+      o += 2;
+    }
+  }
+  return new Blob([dv], {type:"audio/wav"});
+}
+
+function download(blob, name){
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+}
+
+/* ---------------- synth reset ---------------- */
+$("btnResetSynth").addEventListener("click", ()=>{
+  state.wave = "triangle";
+  [...$("segWave").children].forEach(b => b.classList.toggle("sel", b.dataset.w === "triangle"));
+  if(synth) synth.oscillator.type = "triangle";
+  for(const id of SLIDER_IDS){
+    if(id === "rTempo" || id === "rGate") continue;   // musical, not synth
+    const el = $(id);
+    el.value = el.defaultValue;
+    el.dispatchEvent(new Event("input"));
+  }
+  msg("synth reset to factory");
+});
 
 /* ---------------- melody memory ---------------- */
 const MEM_KEY = "terratone_melodies";
