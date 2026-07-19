@@ -589,7 +589,8 @@ function paintStep(i, m){
 function toggleLoop(i){
   if(i >= seqLength()) return;
   state.loopStep = (state.loopStep===i) ? null : i;
-  msg(state.loopStep===null ? "loop released" : "looping step "+(i+1)+" — tweak away");
+  if(state.mode==="chroma" && state.loopStep!==null) state.armed = i;  // capture now targets this step
+  msg(state.loopStep===null ? "loop released" : "looping step "+(i+1)+" — capture retunes it");
   refreshStrips();
 }
 /* strip gestures: tap = arm (chroma only), long-press = clear. No double-tap
@@ -735,9 +736,13 @@ function rgbToHsv(r,g,b){
 }
 function applyColor(r,g,b){
   const {h,s,v}=rgbToHsv(r,g,b);
-  state.colorSteps[state.armed] = {h,s,v,hex:rgbToHex(r,g,b)};
-  msg("step "+(state.armed+1)+" → "+midiToName(midiFromColor(state.colorSteps[state.armed])));
-  state.armed = (state.armed+1)%state.numColorSteps;
+  /* while a step is looping, capture tunes THAT step and stays on it;
+     otherwise it fills the armed step and auto-advances as usual */
+  const looping = state.mode==="chroma" && state.loopStep!==null;
+  const target = looping ? state.loopStep : state.armed;
+  state.colorSteps[target] = {h,s,v,hex:rgbToHex(r,g,b)};
+  msg("step "+(target+1)+" → "+midiToName(midiFromColor(state.colorSteps[target]))+(looping?" (looping)":""));
+  if(!looping) state.armed = (state.armed+1)%state.numColorSteps;
   refreshStrips();
 }
 
