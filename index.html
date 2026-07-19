@@ -2,25 +2,35 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>TONE UNIT</title>
 <style>
-  :root{
-    --bg:#15130f; --panel:#1c1a15; --panel-edge:#2c2820; --slot:#100f0c;
+  :root, [data-theme="dark"]{
+    --bg:#15130f; --bg2:#26221a; --panel:#1c1a15; --panel-edge:#2c2820; --slot:#100f0c;
     --ink:#e9dfc8; --ink-dim:#8a8270; --led:#ff9d3d; --lock:#67d68a; --warn:#e2584d;
-    --accent:#ffb454; --loopc:#67d6d0;
+    --accent:#ffb454; --loopc:#67d6d0; --ledoff:#26221a; --whole:#332d20;
+    --btn-face:linear-gradient(180deg,#3a3225,#241f17); --btn-face-ink:var(--accent);
+    --seg-active-bg:#3d3524; --seg-active-ink:var(--led); --on-ink:#1a1204; --title-grad:linear-gradient(180deg,#fff2d8,var(--accent));
+  }
+  [data-theme="light"]{
+    --bg:#eceae4; --bg2:#f7f5ef; --panel:#ffffff; --panel-edge:#d9d5ca; --slot:#f0ede5;
+    --ink:#2b2823; --ink-dim:#8c8578; --led:#e07a1f; --lock:#2f9e5c; --warn:#c8402f;
+    --accent:#c96a10; --loopc:#2b9d97; --ledoff:#e2ddd0; --whole:#d8d0bd;
+    --btn-face:linear-gradient(180deg,#ffffff,#eee9df); --btn-face-ink:var(--accent);
+    --seg-active-bg:#f3e7d2; --seg-active-ink:var(--accent); --on-ink:#ffffff; --title-grad:linear-gradient(180deg,#d98420,#a5560b);
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html, body{ touch-action:manipulation; }  /* stop Safari double-tap zoom */
   body{
-    margin:0; background:radial-gradient(ellipse at 50% -10%, #26221a, var(--bg) 60%);
+    margin:0; background:radial-gradient(ellipse at 50% -10%, var(--bg2), var(--bg) 60%);
     color:var(--ink); font-family:'Courier New',ui-monospace,monospace;
-    display:flex; justify-content:center; padding:18px 12px 60px;
+    display:flex; justify-content:center; padding:18px 12px 60px; min-height:100vh;
     user-select:none; -webkit-user-select:none;
   }
   #app{width:100%; max-width:430px;}
   header{text-align:center; margin-bottom:12px;}
   h1{margin:0; font-size:26px; letter-spacing:.18em; font-weight:700;
-     background:linear-gradient(180deg,#fff2d8,var(--accent));
+     background:var(--title-grad);
      -webkit-background-clip:text; background-clip:text; color:transparent;}
   .ver{font-size:10px; letter-spacing:.15em; color:var(--ink-dim); margin-top:2px;}
 
@@ -29,7 +39,7 @@
     border-radius:10px; padding:4px; margin-bottom:12px;}
   #modeSwitch button{flex:1; border:none; background:transparent; color:var(--ink-dim);
     padding:10px 0; font-size:12px; letter-spacing:.12em; border-radius:7px; font-weight:700;}
-  #modeSwitch button.active{background:linear-gradient(180deg,#3a3225,#241f17); color:var(--accent);}
+  #modeSwitch button.active{background:var(--btn-face); color:var(--btn-face-ink); box-shadow:0 1px 3px rgba(0,0,0,.15);}
 
   .panel{background:var(--panel); border:1px solid var(--panel-edge); border-radius:14px;
     padding:14px; margin-bottom:12px; box-shadow:0 6px 18px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.03);}
@@ -52,7 +62,7 @@
   #camControls{display:flex; gap:8px; margin-bottom:10px;}
 
   /* steps strip (chromatone) */
-  #steps{display:grid; grid-template-columns:repeat(8,1fr); gap:6px; margin-bottom:6px;}
+  #steps{display:grid; grid-template-columns:repeat(var(--stepcols,8),1fr); gap:6px; margin-bottom:6px;}
   .step{aspect-ratio:1; border-radius:8px; border:2px solid var(--panel-edge); cursor:pointer;
     position:relative; background:var(--slot); transition:transform .08s, border-color .1s, box-shadow .1s;}
   .step:active{transform:scale(.94);}
@@ -85,8 +95,8 @@
   #transport{display:flex; gap:8px;}
   button{font-family:inherit; background:var(--slot); color:var(--ink); border:1px solid var(--panel-edge);
     border-radius:8px; padding:10px 12px; font-size:12px; letter-spacing:.06em; cursor:pointer;}
-  button.primary{background:linear-gradient(180deg,#3a3225,#241f17); color:var(--accent); font-weight:700;}
-  button.primary.on{background:linear-gradient(180deg,var(--led),#c9691f); color:#1a1204;}
+  button.primary{background:var(--btn-face); color:var(--btn-face-ink); font-weight:700;}
+  button.primary.on{background:linear-gradient(180deg,var(--led),#c9691f); color:var(--on-ink);}
   button:disabled{opacity:.4; cursor:default;}
   button:active:not(:disabled){transform:translateY(1px);}
   #msg{font-size:10px; color:var(--ink-dim); letter-spacing:.06em; margin-top:8px; min-height:14px; text-align:center;}
@@ -112,7 +122,7 @@
 
   .seg{display:flex; gap:6px;}
   .seg button{flex:1; font-size:11px; padding:8px 0;}
-  .seg button.active{background:#3d3524; border-color:var(--led); color:var(--led);}
+  .seg button.active{background:var(--seg-active-bg); border-color:var(--led); color:var(--seg-active-ink);}
 
   #btnRec.recOn{background:linear-gradient(180deg,var(--warn),#8f2e27); color:#fff; border-color:var(--warn);}
   .hbtn{float:right; font-size:10px; padding:3px 8px; margin-top:-3px; color:var(--ink-dim);}
@@ -126,6 +136,13 @@
   .memItem .crd{font-size:9px; color:var(--ink-dim);}
   .memItem button{font-size:10px; padding:6px 10px; flex:0 0 auto;}
   .modeOnly{display:none;}
+  #themeBar{display:flex; justify-content:space-between; align-items:center;
+    padding:6px 4px 0; font-size:11px; color:var(--ink-dim); letter-spacing:.1em;}
+  .addrRow{display:flex; gap:6px; margin-bottom:6px;}
+  .addrRow input{flex:1; background:var(--slot); border:1px solid var(--panel-edge); color:var(--ink);
+    border-radius:5px; padding:8px; font-family:inherit; font-size:12px; min-width:0;}
+  .addrRow button{flex:0 0 auto;}
+  #ring circle.ledDot{cursor:pointer;}
   .modeOnly.show{display:block;}
   #hint{font-size:10px; line-height:1.5; color:var(--ink-dim); text-align:center; margin-top:10px;}
   @media (prefers-reduced-motion: reduce){ .ledDot,.tg::after{transition:none;} }
@@ -177,9 +194,13 @@
     <button class="tg on" id="tgGps" aria-label="Use GPS"></button>
   </div>
   <div id="manualPad" style="display:none;">
-    <div style="display:flex; gap:6px; margin-bottom:6px;">
-      <input id="inLat" value="48.8566" style="flex:1;background:var(--slot);border:1px solid var(--panel-edge);color:var(--ink);border-radius:5px;padding:8px;font-family:inherit;font-size:12px;min-width:0;">
-      <input id="inLon" value="2.3522" style="flex:1;background:var(--slot);border:1px solid var(--panel-edge);color:var(--ink);border-radius:5px;padding:8px;font-family:inherit;font-size:12px;min-width:0;">
+    <div class="addrRow">
+      <input id="inAddr" placeholder="type a city or address…">
+      <button id="btnFindAddr">Find</button>
+    </div>
+    <div class="addrRow">
+      <input id="inLat" value="48.8566">
+      <input id="inLon" value="2.3522">
       <button id="btnSetCoord">Set</button>
     </div>
     <div id="dpad">
@@ -189,7 +210,7 @@
     </div>
   </div>
   <div id="digits"></div>
-  <div id="stripLegend" style="margin-top:6px;">double-tap a digit to loop it · tap again to release</div>
+  <div id="stripLegend" style="margin-top:6px;">tap a dot on the ring to loop that note · tap it again to release</div>
 </div>
 
 <!-- ============ CHROMATONE SOURCE ============ -->
@@ -209,8 +230,18 @@
     <input type="color" id="manualColor" value="#ff9d3d" style="flex:1;height:38px;border-radius:6px;border:1px solid var(--panel-edge);background:var(--slot);">
     <button id="manualApply" style="flex:1">Apply color</button>
   </div>
+  <div class="toggleRow">
+    <span>Steps</span>
+    <div class="seg" id="segSteps" style="flex:1; max-width:260px;">
+      <button data-steps="6">6</button>
+      <button data-steps="8" class="active">8</button>
+      <button data-steps="10">10</button>
+      <button data-steps="12">12</button>
+      <button data-steps="14">14</button>
+    </div>
+  </div>
   <div id="steps"></div>
-  <div id="stripLegendC">tap = arm · double-tap = loop that step · long-press = clear</div>
+  <div id="stripLegendC">tap = arm · tap a dot on the ring = loop that step · long-press = clear</div>
 </div>
 
 <!-- ============ TRANSPORT ============ -->
@@ -316,6 +347,15 @@
   <div id="hint">saved in this browser · load restores source &amp; sound · works for both modes</div>
 </div>
 
+<!-- ============ THEME ============ -->
+<div id="themeBar">
+  <span>Theme</span>
+  <div class="seg" id="segTheme" style="max-width:180px;">
+    <button data-theme-set="dark" class="active">Dark</button>
+    <button data-theme-set="light">Light</button>
+  </div>
+</div>
+
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
@@ -351,7 +391,7 @@ const SCALES = {
   hijaz:[0,1,4,5,7,8,10],
 };
 const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
-const NUM_COLOR_STEPS = 8;
+const DEFAULT_COLOR_STEPS = 8;
 
 const state = {
   mode: "terra",            // "terra" | "chroma"
@@ -370,7 +410,8 @@ const state = {
   candidate: null, candHits: 0, watchId: null,
 
   // chromatone
-  colorSteps: Array.from({length:NUM_COLOR_STEPS}, () => ({h:null,s:0,v:0,hex:null})),
+  numColorSteps: DEFAULT_COLOR_STEPS,
+  colorSteps: Array.from({length:DEFAULT_COLOR_STEPS}, () => ({h:null,s:0,v:0,hex:null})),
   armed: 0,
   camOn:false, camFacing:"environment",
 };
@@ -399,7 +440,7 @@ function midiToName(m){ return NOTE_NAMES[((m%12)+12)%12] + (Math.floor(m/12)-1)
 
 /* ================= sequence access ================= */
 function seqLength(){
-  return state.mode==="terra" ? state.digits.length : NUM_COLOR_STEPS;
+  return state.mode==="terra" ? state.digits.length : state.numColorSteps;
 }
 function midiAt(i){
   if(state.mode==="terra"){
@@ -491,15 +532,23 @@ function buildRing(n){
   if(!n) return;
   const R=100, CX=115, CY=115;
   const r = n<=10 ? 9 : (n<=16 ? 7 : 5.5);
+  const hitR = Math.max(r, 13);   // generous tap target even when dots are small
   for(let i=0;i<n;i++){
     const ang=(i/n)*Math.PI*2 - Math.PI/2;
+    const cx=CX+R*Math.cos(ang), cy=CY+R*Math.sin(ang);
+    // invisible hit area so small dots are still easy to tap
+    const hit=document.createElementNS("http://www.w3.org/2000/svg","circle");
+    hit.setAttribute("cx",cx); hit.setAttribute("cy",cy); hit.setAttribute("r",hitR);
+    hit.setAttribute("fill","transparent"); hit.style.cursor="pointer";
+    hit.addEventListener("click",()=>toggleLoop(i));
+    ringSvg.appendChild(hit);
+    // visible LED
     const c=document.createElementNS("http://www.w3.org/2000/svg","circle");
-    c.setAttribute("cx",CX+R*Math.cos(ang));
-    c.setAttribute("cy",CY+R*Math.sin(ang));
-    c.setAttribute("r",r);
-    c.setAttribute("fill","#26221a");
+    c.setAttribute("cx",cx); c.setAttribute("cy",cy); c.setAttribute("r",r);
+    c.setAttribute("fill","var(--ledoff)");
     c.setAttribute("stroke","var(--panel-edge)");
     c.classList.add("ledDot");
+    c.style.pointerEvents="none";
     ringSvg.appendChild(c);
     ledEls.push(c);
   }
@@ -509,13 +558,13 @@ function restingRing(){
   ledEls.forEach((el,i)=>{
     if(state.mode==="chroma"){
       const cs=state.colorSteps[i];
-      el.setAttribute("fill", cs && cs.hex ? cs.hex : "#26221a");
+      el.setAttribute("fill", cs && cs.hex ? cs.hex : "var(--ledoff)");
     } else {
       const isWhole = i < state.wholeCount;
-      el.setAttribute("fill", isWhole ? "#332d20" : "#26221a");
+      el.setAttribute("fill", isWhole ? "var(--whole)" : "var(--ledoff)");
     }
     el.setAttribute("stroke", i===state.loopStep ? "var(--loopc)" : "var(--panel-edge)");
-    el.setAttribute("stroke-width", i===state.loopStep ? 2.5 : 1.5);
+    el.setAttribute("stroke-width", i===state.loopStep ? 3 : 1.5);
   });
 }
 function paintStep(i, m){
@@ -536,15 +585,17 @@ function paintStep(i, m){
   }
 }
 
-/* ================= loop-a-step (double tap) ================= */
+/* ================= loop-a-step (tap the ring dot) ================= */
 function toggleLoop(i){
+  if(i >= seqLength()) return;
   state.loopStep = (state.loopStep===i) ? null : i;
   msg(state.loopStep===null ? "loop released" : "looping step "+(i+1)+" — tweak away");
   refreshStrips();
 }
-/* small helper: attach tap / double-tap / long-press */
+/* strip gestures: tap = arm (chroma only), long-press = clear. No double-tap
+   so Safari won't hijack it as a zoom. Looping now lives on the ring. */
 function attachStepGestures(el, i, onLongPress){
-  let lastTap=0, pressTimer=null, longFired=false;
+  let pressTimer=null, longFired=false;
   const down=()=>{
     longFired=false;
     if(onLongPress) pressTimer=setTimeout(()=>{ longFired=true; onLongPress(i); },550);
@@ -552,12 +603,7 @@ function attachStepGestures(el, i, onLongPress){
   const up=()=>{ clearTimeout(pressTimer); };
   const click=()=>{
     if(longFired) return;
-    const now=Date.now();
-    if(now-lastTap<320){ toggleLoop(i); lastTap=0; }
-    else {
-      lastTap=now;
-      if(state.mode==="chroma"){ state.armed=i; refreshStrips(); }
-    }
+    if(state.mode==="chroma"){ state.armed=i; refreshStrips(); }
   };
   el.addEventListener("touchstart",down,{passive:true});
   el.addEventListener("touchend",up);
@@ -691,7 +737,20 @@ function applyColor(r,g,b){
   const {h,s,v}=rgbToHsv(r,g,b);
   state.colorSteps[state.armed] = {h,s,v,hex:rgbToHex(r,g,b)};
   msg("step "+(state.armed+1)+" → "+midiToName(midiFromColor(state.colorSteps[state.armed])));
-  state.armed = (state.armed+1)%NUM_COLOR_STEPS;
+  state.armed = (state.armed+1)%state.numColorSteps;
+  refreshStrips();
+}
+
+/* resize the chromatone sequence, preserving captured colors where possible */
+function setColorSteps(n){
+  const old = state.colorSteps;
+  const next = Array.from({length:n}, (_,i)=> old[i] ? {...old[i]} : {h:null,s:0,v:0,hex:null});
+  state.numColorSteps = n;
+  state.colorSteps = next;
+  if(state.armed >= n) state.armed = 0;
+  if(state.loopStep !== null && state.loopStep >= n) state.loopStep = null;
+  document.getElementById("steps").style.setProperty("--stepcols", n>10 ? Math.ceil(n/2) : n);
+  buildRing(n);
   refreshStrips();
 }
 function clearColorStep(i){
@@ -726,7 +785,7 @@ function refreshStrips(){
       attachStepGestures(el,i,clearColorStep);
       box.appendChild(el);
     });
-    if(ledEls.length!==NUM_COLOR_STEPS) buildRing(NUM_COLOR_STEPS);
+    if(ledEls.length!==state.numColorSteps) buildRing(state.numColorSteps);
   }
   restingRing();
 }
@@ -747,7 +806,7 @@ function setMode(m){
     if(state.useGps && !state.watchId) startGps();
   } else {
     stopGps();
-    buildRing(NUM_COLOR_STEPS);
+    buildRing(state.numColorSteps);
   }
   refreshStrips();
 }
@@ -818,6 +877,30 @@ $("btnRand").addEventListener("click",()=>{
   $("inLon").value=lon.toFixed(state.decimals);
 });
 
+/* geocode a typed place via OpenStreetMap Nominatim (free, no key) */
+async function findAddress(){
+  const q = $("inAddr").value.trim();
+  if(!q) return;
+  msg("looking up “"+q+"”…");
+  try{
+    const url = "https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" + encodeURIComponent(q);
+    const res = await fetch(url, { headers:{ "Accept":"application/json" } });
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    const data = await res.json();
+    if(!data.length){ msg("no match for “"+q+"”"); return; }
+    const lat = parseFloat(data[0].lat), lon = parseFloat(data[0].lon);
+    commitPosition(lat, lon, null);
+    $("inLat").value = lat.toFixed(state.decimals);
+    $("inLon").value = lon.toFixed(state.decimals);
+    const label = (data[0].display_name || q).split(",").slice(0,2).join(",");
+    msg("found: " + label);
+  }catch(err){
+    msg("lookup failed ("+err.message+") — check connection or enter coordinates manually");
+  }
+}
+$("btnFindAddr").addEventListener("click", findAddress);
+$("inAddr").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); findAddress(); } });
+
 /* ================= chromatone controls ================= */
 $("btnCamToggle").addEventListener("click",()=>{ state.camOn?stopCamera():startCamera(); });
 $("btnFlip").addEventListener("click",()=>{
@@ -831,6 +914,26 @@ $("btnCapture").addEventListener("click",()=>{
 $("manualApply").addEventListener("click",()=>{
   const hex=$("manualColor").value;
   applyColor(parseInt(hex.substr(1,2),16),parseInt(hex.substr(3,2),16),parseInt(hex.substr(5,2),16));
+});
+document.querySelectorAll("[data-steps]").forEach(b=>{
+  b.addEventListener("click",()=>{
+    document.querySelectorAll("[data-steps]").forEach(x=>x.classList.remove("active"));
+    b.classList.add("active");
+    setColorSteps(+b.dataset.steps);
+    msg(b.dataset.steps+"-step sequence");
+  });
+});
+
+/* ================= theme ================= */
+function setTheme(t){
+  document.documentElement.setAttribute("data-theme", t);
+  document.querySelectorAll("[data-theme-set]").forEach(b=>b.classList.toggle("active", b.dataset.themeSet===t));
+  try{ localStorage.setItem("toneunit_theme", t); }catch(e){}
+  // repaint ring/strips so any inline-token fills refresh
+  restingRing();
+}
+document.querySelectorAll("[data-theme-set]").forEach(b=>{
+  b.addEventListener("click",()=>setTheme(b.dataset.themeSet));
 });
 
 /* ================= scale / synth bindings ================= */
@@ -1015,7 +1118,13 @@ function applySnap(s){
     $("inLon").value = s.lon.toFixed(Math.max(4, s.decimals));
     commitPosition(s.lat, s.lon, null);
   } else {
-    state.colorSteps = s.colorSteps.map(c=>({...c}));
+    const cs = s.colorSteps.map(c=>({...c}));
+    state.numColorSteps = cs.length;
+    state.colorSteps = cs;
+    if(state.armed >= cs.length) state.armed = 0;
+    document.querySelectorAll("[data-steps]").forEach(b=>b.classList.toggle("active", +b.dataset.steps===cs.length));
+    $("steps").style.setProperty("--stepcols", cs.length>10 ? Math.ceil(cs.length/2) : cs.length);
+    buildRing(cs.length);
     refreshStrips();
   }
   msg(`loaded “${s.name}”`);
@@ -1055,6 +1164,12 @@ function renderMem(){
 renderMem();
 
 /* ================= boot ================= */
+(function restoreTheme(){
+  let t = "dark";
+  try{ t = localStorage.getItem("toneunit_theme") || "dark"; }catch(e){}
+  setTheme(t);
+})();
+$("steps").style.setProperty("--stepcols", state.numColorSteps);
 commitPosition(state.lat, state.lon, null);
 if(state.useGps) startGps();
 setMode("terra");
